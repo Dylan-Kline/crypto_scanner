@@ -6,7 +6,7 @@ from .config import COINBASE_API_SECRET, COINBASE_API_KEY, COINBASE_15MIN_PATH, 
 
 def collect_crypto_exchange_data(crypto_pair_sym: str, exchange_name: str,
                                  timeframe: str = '15m', limit: int = None, 
-                                 since: int = None, until: int = None) -> pd.DataFrame:
+                                 since: int = None, until: int = None, save_path: str = None) -> pd.DataFrame:
     '''
         Collect OHLCV data from the coinbase cryptocurrency exchange.
         
@@ -17,7 +17,7 @@ def collect_crypto_exchange_data(crypto_pair_sym: str, exchange_name: str,
             limit (int): Number of data points to fetch in total (default = None).
             since (int): The UNIX timestamp of the start date to fetch from (default = None).
             until (int): The UNI timestamp of the end date to fetch data to (default = None)
-            
+            save_path (str): The file path to save the fetched OHLCV data
         Returns:
             pd.DataFrame: A DataFrame containing OHLCV data
     '''
@@ -43,8 +43,7 @@ def collect_crypto_exchange_data(crypto_pair_sym: str, exchange_name: str,
         raise ValueError(f"Timeframe '{timeframe}' is not supported for exchange '{exchange_name}'.")
     
     exchange = exchanges[exchange_name]
-    timeframe_path = timeframe_paths[exchange_name][timeframe]
-    
+
     # Default timestamps from August 17, 2017 to December 4, 2022
     if not since or not until:
         since = int(pd.Timestamp(f'2017-08-17').timestamp() * 1000)
@@ -72,7 +71,7 @@ def collect_crypto_exchange_data(crypto_pair_sym: str, exchange_name: str,
     # Filter the data to ensure it's within the correct timespan and conver to readable timestamp
     if not ohlcv_df.empty:
         ohlcv_df = ohlcv_df[(ohlcv_df['timestamp'] >= since) & (ohlcv_df['timestamp'] <= until)]
-        ohlcv_df['timestamp'] = pd.to_datetime(ohlcv_df['timestamp'], unit='ms').dt.tz_localize('America/New_York').dt.strftime('%Y-%m-%d %H:%M:%S')
+        ohlcv_df['timestamp'] = pd.to_datetime(ohlcv_df['timestamp'], unit='ms', utc=True).dt.tz_convert('America/New_York').dt.strftime('%Y-%m-%d %H:%M:%S')
     else:
         print("Empty ohlcv_df")
     
@@ -81,12 +80,10 @@ def collect_crypto_exchange_data(crypto_pair_sym: str, exchange_name: str,
     since_date_local = since_date_utc.tz_convert('America/New_York').strftime('%Y-%m-%d')
     until_date_utc = pd.to_datetime(until, unit='ms', utc=True)
     until_date_local = until_date_utc.tz_convert('America/New_York').strftime('%Y-%m-%d')
-    print(since_date_local)
-    print(until_date_local)
 
-    save_path = timeframe_path + f"_{since_date_local}_{until_date_local}.csv"
-    print(save_path)
-    #ohlcv_df.to_csv(save_path, index= False)
+    if not save_path:
+        save_path = timeframe_paths[exchange_name][timeframe] +  + f"_{since_date_local}_{until_date_local}.csv"
+    ohlcv_df.to_csv(save_path, index = False)
 
     return ohlcv_df
 

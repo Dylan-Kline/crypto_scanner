@@ -58,6 +58,11 @@ def extract_features_OHLCV(raw_data: pd.DataFrame) -> pd.DataFrame:
     raw_data['ema_50_100_crossover'] = np.where(raw_data['ema_50'] > raw_data['ema_100'], 1.0, 0.0)
     raw_data['ema_1_50_crossover'] = np.where(raw_data['ema_1'] > raw_data['ema_50'], 1.0, 0.0)
 
+    raw_data['ema_1_20_crossover'] = raw_data['ema_1_20_crossover'].diff()
+    raw_data['ema_20_50_crossover'] = raw_data['ema_20_50_crossover'].diff()
+    raw_data['ema_50_100_crossover'] = raw_data['ema_50_100_crossover'].diff()
+    raw_data['ema_1_50_crossover'] = raw_data['ema_1_50_crossover'].diff()
+
     # Temporal Features
     raw_data['month'] = pd.to_datetime(raw_data['timestamp']).dt.month
     raw_data['day'] = pd.to_datetime(raw_data['timestamp']).dt.day

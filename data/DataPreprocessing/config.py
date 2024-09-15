@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+FEATURES_EXCLUDED = ['ema_1', 'ema_20', 'ema_50', 'ema_100', 'timestamp']
+
 current_dir = os.getcwd()
 
 COINBASE_API_KEY = os.getenv("COINBASE_API_KEY")

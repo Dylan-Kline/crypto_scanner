@@ -1,8 +1,8 @@
 import pandas as pd
 
 from data.DataPreprocessing.Extract_Crypto_Data import collect_crypto_exchange_data
-from data.DataPreprocessing.FeatureExtraction import extract_features_OHLCV
-from data.DataPreprocessing.config import COINBASE_15MIN_PATH, OKX_15MIN_PATH
+from data.DataPreprocessing.FeatureExtraction import extract_features_OHLCV, remove_columns_processed_data
+from data.DataPreprocessing.config import COINBASE_15MIN_PATH, OKX_15MIN_PATH, FEATURES_EXCLUDED
 
 def main():
 
@@ -26,6 +26,8 @@ def main():
     processed_data = extract_features_OHLCV(data)
     processed_data.to_csv(data_path + "_processed.csv", index=False)
     
+    save_path = data_path + "_fully_processed.csv"
+    processed_data = remove_columns_processed_data(processed_data= processed_data, remove_columns=FEATURES_EXCLUDED, save_path=save_path)
 main()
 
 

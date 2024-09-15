@@ -17,14 +17,14 @@ def extract_features_OHLCV(raw_data: pd.DataFrame) -> pd.DataFrame:
     raw_data['three_black_crows'] = talib.CDL3BLACKCROWS(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close'])
     raw_data['three_white_soldiers'] = talib.CDL3WHITESOLDIERS(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close'])
     raw_data['doji'] = talib.CDLDOJI(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close'])
-    raw_data['bullish_engulfing'] = talib.CDLENGULFING(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) > 0
-    raw_data['bearish_engulfing'] = talib.CDLENGULFING(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) < 0
-    raw_data['bullish_harami'] = talib.CDLHARAMI(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) > 0
-    raw_data['bearish_harami'] = talib.CDLHARAMI(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) < 0
-    raw_data['three_inside_down'] = talib.CDL3INSIDE(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) < 0
-    raw_data['three_inside_up'] = talib.CDL3INSIDE(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) > 0
-    raw_data['black_marubozu'] = talib.CDLMARUBOZU(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) < 0
-    raw_data['white_marubozu'] = talib.CDLMARUBOZU(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) > 0
+    raw_data['bullish_engulfing'] = np.where(talib.CDLENGULFING(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) > 0, 1.0, 0.0)
+    raw_data['bearish_engulfing'] = np.where(talib.CDLENGULFING(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) < 0, 1.0, 0.0)
+    raw_data['bullish_harami'] = np.where(talib.CDLHARAMI(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) > 0, 1.0, 0.0)
+    raw_data['bearish_harami'] = np.where(talib.CDLHARAMI(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) < 0, 1.0, 0.0)
+    raw_data['three_inside_down'] = np.where(talib.CDL3INSIDE(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) < 0, 1.0, 0.0)
+    raw_data['three_inside_up'] = np.where(talib.CDL3INSIDE(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) > 0, 1.0, 0.0)
+    raw_data['black_marubozu'] = np.where(talib.CDLMARUBOZU(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) < 0, 1.0, 0.0)
+    raw_data['white_marubozu'] = np.where(talib.CDLMARUBOZU(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close']) > 0, 1.0, 0.0)
     raw_data['gravestone_doji'] = talib.CDLGRAVESTONEDOJI(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close'])
     raw_data['on_neck_pattern'] = talib.CDLONNECK(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close'])
     raw_data['hammer'] = talib.CDLHAMMER(raw_data['open'], raw_data['high'], raw_data['low'], raw_data['close'])
@@ -53,6 +53,8 @@ def extract_features_OHLCV(raw_data: pd.DataFrame) -> pd.DataFrame:
     raw_data['ema_50'] = talib.EMA(raw_data['close'], timeperiod=50)
     raw_data['ema_100'] = talib.EMA(raw_data['close'], timeperiod=100)
 
+    raw_data.fillna(0.0, inplace=True)
+
     raw_data['ema_1_20_crossover'] = np.where(raw_data['ema_1'] > raw_data['ema_20'], 1.0, 0.0)
     raw_data['ema_20_50_crossover'] = np.where(raw_data['ema_20'] > raw_data['ema_50'], 1.0, 0.0)
     raw_data['ema_50_100_crossover'] = np.where(raw_data['ema_50'] > raw_data['ema_100'], 1.0, 0.0)
@@ -63,9 +65,31 @@ def extract_features_OHLCV(raw_data: pd.DataFrame) -> pd.DataFrame:
     raw_data['ema_50_100_crossover'] = raw_data['ema_50_100_crossover'].diff()
     raw_data['ema_1_50_crossover'] = raw_data['ema_1_50_crossover'].diff()
 
+    raw_data.fillna(0.0, inplace=True)
+
     # Temporal Features
     raw_data['month'] = pd.to_datetime(raw_data['timestamp']).dt.month
     raw_data['day'] = pd.to_datetime(raw_data['timestamp']).dt.day
     raw_data['num_samples_in_day'] = raw_data.groupby(pd.to_datetime(raw_data['timestamp']).dt.date).cumcount() + 1
 
     return raw_data
+
+def remove_columns_processed_data(processed_data: pd.DataFrame, remove_columns: list['str'] | str, save_path: str = None) -> pd.DataFrame:
+    '''
+    Takes the feature extracted data and removes all unnecessary columns to fully create 
+    the processed data copy for model and analytics usage.
+
+    Parameters:
+        feature_extracted_data (pd.DataFrame): Feature extracted data from which to remove columns.
+        remove_columns (list[str] or str): The columns to remove from the provided data.
+
+    Returns:
+        pd.DataFrame containing all necessary columns for modelling.
+    '''
+
+    data = processed_data.drop(columns=remove_columns)
+
+    if save_path:
+        data.to_csv(save_path, index=False)
+
+    return data

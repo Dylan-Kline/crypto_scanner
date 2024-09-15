@@ -21,13 +21,16 @@ def main():
         data = collect_crypto_exchange_data(trading_sym, exchange_name=exchange, since=since, until=until, save_path=data_path + ".csv")
     else:
         data = pd.read_csv(data_path + ".csv")
-    print(data)
 
+    # Extract Features
     processed_data = extract_features_OHLCV(data)
     processed_data.to_csv(data_path + "_processed.csv", index=False)
     
+    # Remove unnecessary columns
     save_path = data_path + "_fully_processed.csv"
     processed_data = remove_columns_processed_data(processed_data= processed_data, remove_columns=FEATURES_EXCLUDED, save_path=save_path)
+
+    
 main()
 
 

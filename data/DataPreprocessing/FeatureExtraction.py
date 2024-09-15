@@ -48,10 +48,10 @@ def extract_features_OHLCV(raw_data: pd.DataFrame) -> pd.DataFrame:
     raw_data['close_zscore'] = (raw_data['close'] - raw_data['close'].rolling(window=30).mean()) / raw_data['close'].rolling(window=30).std()
 
     # Exponential Moving Average Crossovers
-    raw_data['ema_1'] = talib.EMA(raw_data['close'], timeperiod=2)
-    raw_data['ema_20'] = talib.EMA(raw_data['close'], timeperiod=20)
-    raw_data['ema_50'] = talib.EMA(raw_data['close'], timeperiod=50)
-    raw_data['ema_100'] = talib.EMA(raw_data['close'], timeperiod=100)
+    raw_data['ema_1'] = talib.EMA(raw_data['close'], timeperiod=2).interpolate()
+    raw_data['ema_20'] = talib.EMA(raw_data['close'], timeperiod=20).interpolate()
+    raw_data['ema_50'] = talib.EMA(raw_data['close'], timeperiod=50).interpolate()
+    raw_data['ema_100'] = talib.EMA(raw_data['close'], timeperiod=100).interpolate()
 
     raw_data.fillna(0.0, inplace=True)
 

@@ -2,6 +2,7 @@ import pandas as pd
 
 from data.DataPreprocessing.Extract_Crypto_Data import collect_crypto_exchange_data
 from data.DataPreprocessing.FeatureExtraction import extract_features_OHLCV, remove_columns_processed_data
+from data.DataPreprocessing.Label import label_crypto_AB
 from data.DataPreprocessing.config import COINBASE_15MIN_PATH, OKX_15MIN_PATH, FEATURES_EXCLUDED
 
 def main():
@@ -15,6 +16,8 @@ def main():
     since = int(pd.Timestamp(f"{since_date}", tz='America/New_York').timestamp() * 1000)
     until = int(pd.Timestamp(f"{until_date}", tz='America/New_York').timestamp() * 1000)
     fetch = False
+    process = False
+    remove_cols = False
 
     if fetch:
         # Fetch crypto from exchange
@@ -23,14 +26,21 @@ def main():
         data = pd.read_csv(data_path + ".csv")
 
     # Extract Features
-    processed_data = extract_features_OHLCV(data)
-    processed_data.to_csv(data_path + "_processed.csv", index=False)
+    if process:
+        processed_data = extract_features_OHLCV(data)
+        processed_data.to_csv(data_path + "_processed.csv", index=False)
     
     # Remove unnecessary columns
-    save_path = data_path + "_fully_processed.csv"
-    processed_data = remove_columns_processed_data(processed_data= processed_data, remove_columns=FEATURES_EXCLUDED, save_path=save_path)
+    if remove_cols:
+        save_path = data_path + "_fully_processed.csv"
+        processed_data = remove_columns_processed_data(processed_data= processed_data, remove_columns=FEATURES_EXCLUDED, save_path=save_path)
+    else:
+        processed_data = pd.read_csv(data_path + "_fully_processed.csv")
 
-    
+    # Label data
+    labeled_data = label_crypto_AB(data=processed_data)
+    labeled_data.to_csv(data_path + "_labeled.csv", index=False)
+
 main()
 
 

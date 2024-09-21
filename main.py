@@ -1,9 +1,9 @@
 import pandas as pd
 
-from data.DataPreprocessing.Extract_Crypto_Data import collect_crypto_exchange_data
-from data.DataPreprocessing.FeatureExtraction import extract_features_OHLCV, remove_columns_processed_data
-from data.DataPreprocessing.Label import label_crypto_AB
-from data.DataPreprocessing.config import COINBASE_15MIN_PATH, OKX_15MIN_PATH, FEATURES_EXCLUDED
+from src.data_processing.Extract_Crypto_Data import collect_crypto_exchange_data
+from src.data_processing.FeatureExtraction import extract_features_OHLCV, remove_columns_processed_data
+from src.data_processing.Label import label_crypto_AB
+from src.data_processing.config import COINBASE_15MIN_PATH, OKX_15MIN_PATH, FEATURES_EXCLUDED
 
 def main():
 
@@ -15,9 +15,9 @@ def main():
     data_path = OKX_15MIN_PATH + f"_{since_date}_{until_date}"
     since = int(pd.Timestamp(f"{since_date}", tz='America/New_York').timestamp() * 1000)
     until = int(pd.Timestamp(f"{until_date}", tz='America/New_York').timestamp() * 1000)
-    fetch = False
-    process = False
-    remove_cols = False
+    fetch = True
+    process = True
+    remove_cols = True
 
     if fetch:
         # Fetch crypto from exchange

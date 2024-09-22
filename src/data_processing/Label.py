@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import talib
 
-from util.calculations.feature_calculations import calculate_open_close_pct_change
+from src.util.calculations.feature_calculations import calculate_open_close_pct_change
 
 def label_crypto_AB(data: pd.DataFrame, forW: int = 2, backW: int = 5, 
                     close_price_column: str = 'close',

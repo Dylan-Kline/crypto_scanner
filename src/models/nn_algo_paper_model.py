@@ -69,7 +69,7 @@ class NN_Algo(L.LightningModule):
 
         self.validation_steps_counter += 1
         self.log('val_loss', loss)
-        self.log('accuracy', acc)
+        self.log('val_acc', acc)
         return loss
     
     def configure_optimizers(self):

@@ -33,26 +33,53 @@ class NN_Algo(L.LightningModule):
     def __init__(self):
         super().__init__()
         self.model = NN_algo_model()
+        self.validation_accs = list()
+        self.validation_steps_counter = 0
         
     def training_step(self, batch, batch_indx):
         x, y = batch
         logits = self.model(x)
         loss = self.model.criterion(logits, y)
+
+        # Step interval for logging training accuracy to console
+        steps_interval = 350
+        if self.global_step % steps_interval == 0:
+            preds = torch.argmax(logits, dim=1)
+            acc = (preds == y).float().mean()
+            print(acc)
+        
+        # Metric logging
         self.log('train_loss', loss)
+
         return loss
     
     def validation_step(self, batch, batch_indx):
         x, y = batch
         logits = self.model(x)
         loss = self.model.criterion(logits, y)
+
         preds = torch.argmax(logits, dim=1)
         acc = (preds == y).float().mean()
+        self.validation_accs.append(acc)
+
+        steps_interval = 100
+        if self.validation_steps_counter % steps_interval == 0:
+            print(y)
+            print(preds)
+
+        self.validation_steps_counter += 1
         self.log('val_loss', loss)
         self.log('accuracy', acc)
         return loss
     
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.parameters(), lr=0.001)
+        optimizer = optim.AdamW(self.parameters(), lr=0.0001)
         return optimizer
+    
+    def on_validation_epoch_end(self):
+        max_acc = max(self.validation_accs)
+        self.validation_accs.clear()
+        self.validation_steps_counter = 0
+        print(max_acc)
         
         

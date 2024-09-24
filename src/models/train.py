@@ -27,8 +27,8 @@ def _load_data(file_path: str) -> tuple[DataLoader, DataLoader]:
     val_dataset = TensorDataset(torch.tensor(x_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.long))
     
     # Create DataLoaders
-    train_dataloader = DataLoader(train_dataset, batch_size=32)
-    val_dataloader = DataLoader(val_dataset, batch_size=32)
+    train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
     
     return (train_dataloader, val_dataloader)
 

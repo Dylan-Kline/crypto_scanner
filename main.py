@@ -5,7 +5,8 @@ from src.models.train import train_model
 from src.data_processing.Extract_Crypto_Data import collect_crypto_exchange_data
 from src.data_processing.FeatureExtraction import extract_features_OHLCV, remove_columns_processed_data
 from src.data_processing.Label import label_crypto_AB
-from src.data_processing.config import COINBASE_15MIN_PATH, OKX_15MIN_PATH, FEATURES_EXCLUDED
+from src.data_processing.config import COINBASE_15MIN_PATH, OKX_15MIN_PATH, FEATURES_EXCLUDED, CRYPTO_15MIN_PATH
+from src.data_processing.DataPipeline import training_pipeline_OHLCV
 
 def main():
 
@@ -27,23 +28,8 @@ def main():
     else:
         data = pd.read_csv(data_path + ".csv")
 
-    # Extract Features
-    if process:
-        processed_data = extract_features_OHLCV(data)
-        processed_data.to_csv(data_path + "_processed.csv", index=False)
-    
-    # Remove unnecessary columns
-    if remove_cols:
-        save_path = data_path + "_fully_processed.csv"
-        processed_data = remove_columns_processed_data(processed_data= processed_data, remove_columns=FEATURES_EXCLUDED, save_path=save_path)
-    else:
-        processed_data = pd.read_csv(data_path + "_fully_processed.csv")
-
-    # Label data
-    labeled_data = label_crypto_AB(data=processed_data)
-    labeled_data.to_csv(data_path + "_labeled.csv", index=False)
-    
-    path = data_path + "_labeled.csv"
+    training_pipeline_OHLCV(raw_data=data, candle_interval='15min')
+    path = CRYPTO_15MIN_PATH + "scaled_labeled.csv"
     model = NN_Algo()
     train_model(model, path)
     

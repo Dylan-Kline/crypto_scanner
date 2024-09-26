@@ -1,7 +1,5 @@
 import pandas as pd
 import lightning as L
-import websockets
-import torch
 import time
 import asyncio
 import json
@@ -79,49 +77,40 @@ async def real_time_predictions(model, api_params: dict, device: str = 'cuda:0')
         raw_data = await candle_queue.get()
         print(raw_data)
     
-async def fetch_real_time_crypto_data(crypto_pair_sym: str, websocket_url: str, 
-                                timeframe: str):
-    candle_timeframe = "candle" + timeframe
-    async with websockets.connect(websocket_url) as wb:
+async def fetch_real_time_crypto_data(crypto_pair_sym: str, exchange_obj, 
+                                timeframe: str, limit: int = 300):
         
-        # Subscribe to real-time candlestick data for the symbol
-        params = {
-            "op": "subscribe",
-            "args": [{
-                "channel": candle_timeframe,
-                "instId": crypto_pair_sym
-            }]
-        }
-        await wb.send(json.dumps(params))
+    candles = await exchange_obj.watchOHLCV(symbol=crypto_pair_sym, timeframe=timeframe, limit=limit)
+    print(candles)
+    
+    # Handle incoming messages from websocket
+    while True:
+        message = await wb.recv()
+        data = json.loads(message)
+        print(data)
         
-        # Handle incoming messages from websocket
-        while True:
-            message = await wb.recv()
-            data = json.loads(message)
+        # Make sure data contains candlestick data
+        if 'data' in data and data['arg']['channel'] == candle_timeframe:
             print(data)
+            candle = data['data'][0]
+            timestamp = pd.to_datetime(candle[0], unit='ms')
+            open_price = float(candle[1])
+            high_price = float(candle[2])
+            low_price = float(candle[3])
+            close_price = float(candle[4])
+            volume = float(candle[5])
             
-            # Make sure data contains candlestick data
-            if 'data' in data and data['arg']['channel'] == candle_timeframe:
-                print(data)
-                candle = data['data'][0]
-                timestamp = pd.to_datetime(candle[0], unit='ms')
-                open_price = float(candle[1])
-                high_price = float(candle[2])
-                low_price = float(candle[3])
-                close_price = float(candle[4])
-                volume = float(candle[5])
-                
-                # Create a candle dictionary
-                candle_data = {
-                    'timestamp': timestamp,
-                    'open': open_price,
-                    'high': high_price,
-                    'low': low_price,
-                    'close': close_price,
-                    'volume': volume
-                }
-                
-                candle_data = pd.DataFrame(candle_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+            # Create a candle dictionary
+            candle_data = {
+                'timestamp': timestamp,
+                'open': open_price,
+                'high': high_price,
+                'low': low_price,
+                'close': close_price,
+                'volume': volume
+            }
+            
+            candle_data = pd.DataFrame(candle_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
 
-                # Put the candle data in the queue for prediction
-                await candle_queue.put(candle_data)
+            # Put the candle data in the queue for prediction
+            await candle_queue.put(candle_data)

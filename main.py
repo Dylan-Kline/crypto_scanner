@@ -2,11 +2,11 @@ import pandas as pd
 
 from src.models.nn_algo_paper_model import NN_Algo
 from src.models.train import train_model
-from src.data_processing.Extract_Crypto_Data import collect_crypto_exchange_data
+from src.data_processing.Extract_Crypto_Data import fetch_historical_crypto_data
 from src.data_processing.FeatureExtraction import extract_features_OHLCV, remove_columns_processed_data
 from src.data_processing.Label import label_crypto_AB
 from src.data_processing.config import COINBASE_15MIN_PATH, OKX_15MIN_PATH, FEATURES_EXCLUDED, CRYPTO_15MIN_PATH
-from src.data_processing.DataPipeline import training_pipeline_OHLCV
+from data_processing.DataPipelines import training_pipeline_OHLCV
 
 def main():
 
@@ -24,7 +24,7 @@ def main():
 
     if fetch:
         # Fetch crypto from exchange
-        data = collect_crypto_exchange_data(trading_sym, exchange_name=exchange, since=since, until=until, save_path=data_path + ".csv")
+        data = fetch_historical_crypto_data(trading_sym, exchange_name=exchange, since=since, until=until, save_path=data_path + ".csv", save = True)
     else:
         data = pd.read_csv(data_path + ".csv")
 

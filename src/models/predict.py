@@ -104,10 +104,23 @@ async def fetch_real_time_crypto_data(crypto_pair_sym: str,
                                     timeframe: str, 
                                     candle_queue: asyncio.Queue, 
                                     historical_data: AsyncCappedList,
-                                    limit: int = 300):
+                                    limit: int = 300) -> None:
+    '''
+    Fetch real-time cryptocurrency candle data and maintain historical data for prediction.
+
+    Parameters:
+        crypto_pair_sym (str): The symbol of the cryptocurrency pair to fetch data for (e.g., 'BTC/USDT').
+        exchange_obj: The exchange object that provides methods to fetch real-time and historical OHLCV data.
+        timeframe (str): The timeframe for each candle (e.g., '1m', '15m', '1h').
+        candle_queue (asyncio.Queue): An asynchronous queue where the combined candle data (historical + real-time) is placed.
+        historical_data (AsyncCappedList): An asynchronous capped list to store historical OHLCV data.
+        limit (int, optional): The number of historical candles to fetch initially. Default is 300.
+
+    Returns:
+        Nothing
+    '''
     
     sleep_duration_ms = _get_sleep_duration_ms(timeframe=timeframe) # Time to sleep between requests
-    print(sleep_duration_ms)
 
     async with aiohttp.ClientSession() as session:
         while True:
@@ -120,7 +133,6 @@ async def fetch_real_time_crypto_data(crypto_pair_sym: str,
 
                 # Fetch initial limit candles for history
                 historical_candles = await exchange_obj.fetchOHLCV(symbol=crypto_pair_sym, timeframe=timeframe, limit=limit)
-                print(historical_candles[-3:])
 
                 # Check if duplicate data exists
                 if historical_candles[-1][0] == candles[0]:
@@ -134,24 +146,19 @@ async def fetch_real_time_crypto_data(crypto_pair_sym: str,
                 # Add real-time candle to historical data
                 await historical_data.append(candles)
 
-            print("Updated data:", (await historical_data.get_list())[-3:])
+            # Grab candle data
             historical_candles = await historical_data.get_list()
 
             # Combine candle info into a pandas DataFrame
             all_candles = historical_candles
             candle_data = pd.DataFrame(all_candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-            print(candle_data)
+            
             # Put the candle data in the queue for prediction
             await candle_queue.put(candle_data)
 
+            # Sleep for the sleep duration
             start_time_ms = int(time.time() * 1000) # Current time in milliseconds
             ms_til_next_request = sleep_duration_ms - (start_time_ms % sleep_duration_ms) # Time in ms until the next request
-        
-            print(start_time_ms)
-            print(start_time_ms % sleep_duration_ms)
-            print(ms_til_next_request)
-
-            # Sleep for the sleep duration
             await asyncio.sleep(ms_til_next_request // 1000)
 
 def _get_sleep_duration_ms(timeframe: str) -> int:

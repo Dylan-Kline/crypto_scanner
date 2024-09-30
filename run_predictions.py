@@ -2,6 +2,7 @@ import asyncio
 import argparse
 import ccxt.pro as ccxtpro
 
+from src.util.data_structures.CappedListAsync import AsyncCappedList
 from src.models.predict import load_prediction_model, fetch_real_time_crypto_data, real_time_predictions
 from src.models.models_config import MLP_MODEL_CHECKPOINT_PATH
 
@@ -21,6 +22,7 @@ async def main(model_path: str,
         device (str): The device to perform inference on ('cpu' or 'cuda').
     '''
 
+    historical_candle_data = AsyncCappedList(max_len=300) # Holds past OHLCV data
     candle_queue = asyncio.Queue(maxsize=100) # Holds the latest timeframe OHLCV data
     exchange_objs = {
         'okx': ccxtpro.okx({'enableRateLimit': True})
@@ -35,7 +37,8 @@ async def main(model_path: str,
     fetch_task = asyncio.create_task(fetch_real_time_crypto_data(crypto_pair_sym=crypto_pair_sym,
                                                                  exchange_obj=exchange_obj,
                                                                  timeframe=timeframe,
-                                                                 candle_queue=candle_queue))
+                                                                 candle_queue=candle_queue,
+                                                                 historical_data=historical_candle_data))
     prediction_task = asyncio.create_task(real_time_predictions(model=model, 
                                                                 candle_queue=candle_queue, 
                                                                 device=device))

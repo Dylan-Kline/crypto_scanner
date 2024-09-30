@@ -1,14 +1,16 @@
 import pandas as pd
 import lightning as L
 import time
-import argparse
+from datetime import datetime, timedelta
 import torch
 import ccxt.pro as ccxtpro
 import asyncio
 import json
+import aiohttp
 
 from lightning import LightningModule
 
+from ..util.data_structures.CappedListAsync import AsyncCappedList
 from .nn_algo_paper_model import NN_Algo
 from ..data_processing.Extract_Crypto_Data import fetch_historical_crypto_data
 
@@ -79,7 +81,7 @@ def predict(model, data: pd.DataFrame, device: str = 'cpu') -> int:
 
     return int(label.item())
 
-async def real_time_predictions(model, candle_queue: asyncio.Queue, device: str = 'cuda:0') -> int:
+async def real_time_predictions(model, candle_queue: asyncio.Queue, device: str = 'cpu') -> int:
     '''
     Performs real time predictions with the provided model.
     
@@ -101,42 +103,81 @@ async def fetch_real_time_crypto_data(crypto_pair_sym: str,
                                     exchange_obj, 
                                     timeframe: str, 
                                     candle_queue: asyncio.Queue, 
+                                    historical_data: AsyncCappedList,
                                     limit: int = 300):
     
-    # Fetch initial 100 candles for history
-    historical_candles = await exchange_obj.fetchOHLCV(symbol=crypto_pair_sym, timeframe=timeframe, limit=limit)
-    
-    candles = await exchange_obj.watchOHLCV(symbol=crypto_pair_sym, timeframe=timeframe, limit=limit)
-    print(candles)
-    
-    # Handle incoming messages from websocket
-    while True:
-        message = await wb.recv()
-        data = json.loads(message)
-        print(data)
-        
-        # Make sure data contains candlestick data
-        if 'data' in data and data['arg']['channel'] == candle_timeframe:
-            print(data)
-            candle = data['data'][0]
-            timestamp = pd.to_datetime(candle[0], unit='ms')
-            open_price = float(candle[1])
-            high_price = float(candle[2])
-            low_price = float(candle[3])
-            close_price = float(candle[4])
-            volume = float(candle[5])
-            
-            # Create a candle dictionary
-            candle_data = {
-                'timestamp': timestamp,
-                'open': open_price,
-                'high': high_price,
-                'low': low_price,
-                'close': close_price,
-                'volume': volume
-            }
-            
-            candle_data = pd.DataFrame(candle_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    sleep_duration_ms = _get_sleep_duration_ms(timeframe=timeframe) # Time to sleep between requests
+    print(sleep_duration_ms)
 
+    async with aiohttp.ClientSession() as session:
+        while True:
+
+            # Fetch real-time candle data for the timeframe
+            candles = (await exchange_obj.watchOHLCV(symbol=crypto_pair_sym, timeframe=timeframe, limit=limit))[0]
+
+            # Fetch Historical candle data
+            if await historical_data.get_size() == 0:
+
+                # Fetch initial limit candles for history
+                historical_candles = await exchange_obj.fetchOHLCV(symbol=crypto_pair_sym, timeframe=timeframe, limit=limit)
+                print(historical_candles[-3:])
+
+                # Check if duplicate data exists
+                if historical_candles[-1][0] == candles[0]:
+                    del historical_candles[-1]
+                
+                # Add info to historical data
+                await historical_data.extend(historical_candles)
+
+            # Handle past and current candle data
+            if await historical_data.get_size() > 0:
+
+                # Retrieve last stored candled data
+                last_stored = await historical_data.get_last()
+
+                # Check for duplicates
+                if last_stored and last_stored[0] == candles[0]:
+                    print("Skipping duplicate entry.")
+                else:
+                    # Add real-time candle to historical data
+                    await historical_data.append(candles)
+
+            print("Updated data:", (await historical_data.get_list())[-3:])
+            historical_candles = await historical_data.get_list()
+
+            # Combine candle info into a pandas DataFrame
+            all_candles = historical_candles
+            candle_data = pd.DataFrame(all_candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+            print(candle_data)
             # Put the candle data in the queue for prediction
             await candle_queue.put(candle_data)
+
+            start_time_ms = int(time.time() * 1000) # Current time in milliseconds
+            ms_til_next_request = sleep_duration_ms - (start_time_ms % sleep_duration_ms) # Time in ms until the next request
+        
+            print(start_time_ms)
+            print(start_time_ms % sleep_duration_ms)
+            print(ms_til_next_request)
+            
+            # Sleep for the sleep duration
+            await asyncio.sleep(ms_til_next_request // 1000)
+
+def _get_sleep_duration_ms(timeframe: str) -> int:
+    '''
+    Calculates the number of ms to wait before requesting data again from the exchange.
+    
+    Parameters:
+        timeframe (str): The string representation of the time to wait.
+        
+    Returns:
+        int: number of ms to wait
+    '''
+
+    if timeframe.endswith('m'):
+        ms = int(timeframe[:-1]) * 60000
+    elif timeframe.endswith('h'):
+        ms = int(timeframe[:-1]) * 3600000
+    else:
+        raise ValueError("Unsupported timeframe. Use 'm' for minutes or 'h' for hours.")
+
+    return ms

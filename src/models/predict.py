@@ -131,16 +131,8 @@ async def fetch_real_time_crypto_data(crypto_pair_sym: str,
 
             # Handle past and current candle data
             if await historical_data.get_size() > 0:
-
-                # Retrieve last stored candled data
-                last_stored = await historical_data.get_last()
-
-                # Check for duplicates
-                if last_stored and last_stored[0] == candles[0]:
-                    print("Skipping duplicate entry.")
-                else:
-                    # Add real-time candle to historical data
-                    await historical_data.append(candles)
+                # Add real-time candle to historical data
+                await historical_data.append(candles)
 
             print("Updated data:", (await historical_data.get_list())[-3:])
             historical_candles = await historical_data.get_list()
@@ -158,7 +150,7 @@ async def fetch_real_time_crypto_data(crypto_pair_sym: str,
             print(start_time_ms)
             print(start_time_ms % sleep_duration_ms)
             print(ms_til_next_request)
-            
+
             # Sleep for the sleep duration
             await asyncio.sleep(ms_til_next_request // 1000)
 

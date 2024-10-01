@@ -1,0 +1,5 @@
+(1) Adjust training and prediction pipelines to work with backward and forward windows
+(2) Implement training monitoring using weights and biases library
+(3) Add data set versioning for the training data 
+(4) Include timestamps as indices for the data, to make sure it is sorted by time
+(5) Create dynamic model loading functionality

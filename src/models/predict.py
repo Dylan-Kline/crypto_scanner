@@ -14,8 +14,6 @@ from ..util.data_structures.CappedListAsync import AsyncCappedList
 from .nn_algo_paper_model import NN_Algo
 from ..data_processing.Extract_Crypto_Data import fetch_historical_crypto_data
 
-# TODO create dynamic model loading functionality
-
 def _create_model_from_hparams(hparams):
     '''
     Constructs the model from the provided hyperparameters.
@@ -156,7 +154,7 @@ async def fetch_real_time_crypto_data(crypto_pair_sym: str,
             # Put the candle data in the queue for prediction
             await candle_queue.put(candle_data)
 
-            # Sleep for the sleep duration
+            # Sleep until next request time
             start_time_ms = int(time.time() * 1000) # Current time in milliseconds
             ms_til_next_request = sleep_duration_ms - (start_time_ms % sleep_duration_ms) # Time in ms until the next request
             await asyncio.sleep(ms_til_next_request // 1000)

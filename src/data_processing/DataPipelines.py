@@ -9,18 +9,78 @@ from .FeatureExtraction import extract_features_OHLCV, remove_columns_processed_
 from .Label import label_crypto_AB
 from .config import FEATURES_EXCLUDED, FEATURE_SCALER_PATH, CRYPTO_15MIN_PATH
 
-# TODO
-# 1) create prediction pipeline
+def _balance_class_labels_undersample(labeled_data: pd.DataFrame) -> pd.DataFrame:
+    '''
+    Performs undersampling to balance the class labels of the provided data.
+
+    Parameters:
+        labeled_data (pd.DataFrame): The labeled dataset to balance.
+
+    Returns:
+        pd.DataFrame: A class balanced dataset.
+    '''
+
+    # Balance the classes
+    buy_data = labeled_data[labeled_data['label'] == 0]
+    hold_data = labeled_data[labeled_data['label'] == 1]
+    sell_data = labeled_data[labeled_data['label'] == 2]
+
+    majority_undersampled = resample(hold_data, replace=False,
+                                     n_samples=len(buy_data),
+                                     random_state=42)
+    balanced_data = pd.concat([buy_data, majority_undersampled, sell_data])
+
+    return balanced_data
+
+def create_training_feature_vectors(data: pd.DataFrame,
+                           backward_window: int = 5,
+                           forward_window: int = 2) -> pd.DataFrame:
+    '''
+    Creates the feature vectorized data based on the backward and forward windows.
+
+    Parameters:
+        data (pd.DataFrame): The processed data to turn into feature vectors.
+        backward_window (int): The number of days to look back and include as features. (default = 5)
+        forward_window (int): The number of days to look ahead and include as targets. (default = 2)
+
+    Returns:
+        pd.DataFrame: A new dataframe containing the flattened feature vectors containing backward_window examples,
+        and forward_window labels.
+    '''
+
+    training_data = pd.DataFrame()
+    initial_position = backward_window + forward_window
+    for offset in range(0, len(data) - backward_window, forward_window):
+        
+        # Get forward positions of both windows
+        backward_window_front_pos = offset + backward_window
+        forward_window_front_pos = backward_window_front_pos + forward_window
+
+        # Grab the current window data
+        backward_data = data.iloc[offset:backward_window_front_pos]
+        forward_data = data.iloc[backward_window_front_pos:forward_window_front_pos]
+
+        # Create training example
+        features = backward_data.values.flatten()
+        labels = forward_data[:, -forward_window:].values.flatten()
+        print(features)
+        print(labels)
+
+    return training_data
 
 def training_pipeline_OHLCV(raw_data: pd.DataFrame,
-                            candle_interval: str) -> pd.DataFrame:
+                            candle_interval: str,
+                            backward_window: int = 5,
+                            forward_window: int = 2) -> pd.DataFrame:
     '''
     Converts the provided raw OHLCV cryptocurrency data into a useable format for training.
     
     Parameters:
         raw_data (pd.DataFrame): The raw data to be converted into training data.
         candle_interval (str): The timespan between data points (e.g. '15min', '1h', etc.)
-        
+        backward_window (int): The number of days to look back in the data for the input vector. (default = 5)
+        forward_window (int): The number of days to predict the label for. (default = 2)
+
     Returns:
         pd.DataFrame: A ready-made training dataset.
     '''
@@ -49,15 +109,13 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
     raw_data_scaled = pd.DataFrame(raw_data_scaled, columns=raw_data.columns)
     labeled_data = label_crypto_AB(data=raw_data_scaled)
 
-    # Balanace the classes
-    buy_data = labeled_data[labeled_data['label'] == 0]
-    hold_data = labeled_data[labeled_data['label'] == 1]
-    sell_data = labeled_data[labeled_data['label'] == 2]
+    # Create input feature vectors based on backward window and labels from forward window
+    vectored_data = create_training_feature_vectors(data=labeled_data,
+                                                    backward_window=backward_window,
+                                                    forward_window=forward_window)
 
-    majority_undersampled = resample(hold_data, replace=False,
-                                     n_samples=len(buy_data),
-                                     random_state=42)
-    balanced_data = pd.concat([buy_data, majority_undersampled, sell_data])
+    # Balance the classes
+    balanced_data = _balance_class_labels_undersample(labeled_data=vectored_data)
 
     # Save training data
     interval_path = {
@@ -66,7 +124,7 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
     save_path = interval_path[candle_interval] + "scaled_labeled.csv"
     balanced_data.to_csv(save_path, index=False)
 
-    return labeled_data
+    return balanced_data
 
 def prediction_pipeline_OHLCV(raw_data: pd.DataFrame) -> pd.DataFrame:
     '''

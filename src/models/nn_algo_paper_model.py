@@ -6,12 +6,12 @@ import lightning as L
 
 class NN_algo_model(nn.Module):
     
-    def __init__(self):
+    def __init__(self, input_size, output_size):
         super().__init__()
-        self.input = nn.Linear(40, 128)
+        self.input = nn.Linear(input_size, 128)
         self.h1 = nn.Linear(128, 64)
         self.h2 = nn.Linear(64, 32)
-        self.output = nn.Linear(32, 3)
+        self.output = nn.Linear(32, output_size)
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.01)
         self.softmax = nn.Softmax(dim=1)
         self.criterion = nn.CrossEntropyLoss()
@@ -30,9 +30,9 @@ class NN_Algo(L.LightningModule):
     This class builds off of the nn algo research paper.
     '''
     
-    def __init__(self):
+    def __init__(self, input_size, output_size):
         super().__init__()
-        self.model = NN_algo_model()
+        self.model = NN_algo_model(input_size=input_size, output_size=output_size)
         self.validation_accs = list()
         self.validation_steps_counter = 0
         

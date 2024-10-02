@@ -23,7 +23,7 @@ def main():
     since = int(pd.Timestamp(f"{since_date}", tz='America/New_York').timestamp() * 1000)
     until = int(pd.Timestamp(f"{until_date}", tz='America/New_York').timestamp() * 1000)
     fetch = False
-    process = False
+    process = True
     find_lr = False
     remove_cols = False
     backtest_since_date = '2022-01-01'
@@ -34,13 +34,14 @@ def main():
         data = fetch_historical_crypto_data(trading_sym, exchange_name=exchange, since=since, until=until, save_path=data_path + ".csv", save = True)
     else:
         data = pd.read_csv(data_path + ".csv")
-    
+    print("Data Loaded...")
     bWin = 5
     fWin = 1
     if process:
         training_pipeline_OHLCV(raw_data=data, candle_interval='15min', backward_window=bWin, forward_window=fWin)
     train_path = CRYPTO_15MIN_PATH + f"scaled_labeled_bWin_{bWin}_fWin_{fWin}_train.csv"
     val_path = CRYPTO_15MIN_PATH + f"scaled_labeled_bWin_{bWin}_fWin_{fWin}_val.csv"
+    exit()
     
     if find_lr:
         model = NN_algo_model(200, 3)

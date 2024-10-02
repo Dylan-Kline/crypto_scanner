@@ -75,7 +75,7 @@ def _create_training_feature_vectors(data: pd.DataFrame,
     examples = list()
     initial_position = backward_window + forward_window
     for offset in range(0, len(data) - initial_position + 1, forward_window):
-        
+        print(offset)
         # Get forward positions of both windows
         backward_window_front_pos = offset + backward_window
         forward_window_front_pos = backward_window_front_pos + forward_window
@@ -113,6 +113,7 @@ def _split_data(raw_data: pd.DataFrame,
         pd.DataFrame, pd.DataFrame, pd.DataFrame: Training, validation, backtest.
     """
     backtest_data = raw_data[(raw_data['timestamp'] >= backtest_start) & (raw_data['timestamp'] <= backtest_end)]
+    raw_data = raw_data[(raw_data['timestamp'] < backtest_start) & (raw_data['timestamp'] > backtest_end)] # exclude backtest data
     split_index = int(len(raw_data) * split_ratio)
     train_data = raw_data.iloc[:split_index]
     val_data = raw_data.iloc[split_index:]
@@ -159,7 +160,9 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
                             candle_interval: str,
                             backward_window: int = 5,
                             forward_window: int = 1,
-                            fit_scaler: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+                            fit_scaler: bool = False,
+                            backtest_start: str = '2022-01-01',
+                            backtest_end: str = '2022-04-01') -> tuple[pd.DataFrame, pd.DataFrame]:
     '''
     Converts the provided raw OHLCV cryptocurrency data into a useable format for training.
     
@@ -169,16 +172,20 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
         backward_window (int): The number of days to look back in the data for the input vector. (default = 5)
         forward_window (int): The number of days to predict the label for. (default = 1)
         fit_scaler (bool): Whether to fit the scaler to the training data or not. (default = False)
-        
+        backtest_start (str): Start date of backtesting data (default = '2022-01-01')
+        backtest_end (str): End date of backtesting data (default = '2022-04-01')
+
     Returns:
         pd.DataFrame: Ready made training and validation datasets
     '''
-
+    print("beginning training pipeline...")
     # Extract the features
     raw_data = extract_features_OHLCV(raw_data=raw_data)
     
     # Split data into training and validation sets
-    train_data, val_data, backtest_data = _split_data(raw_data=raw_data)
+    train_data, val_data, backtest_data = _split_data(raw_data=raw_data, 
+                                                      backtest_start=backtest_start,
+                                                      backtest_end=backtest_end)
     
     # Remove unneeded columns
     train_data = remove_columns_processed_data(train_data, remove_columns=FEATURES_EXCLUDED)
@@ -186,6 +193,7 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
     backtest_data = remove_columns_processed_data(backtest_data, remove_columns=FEATURES_EXCLUDED)
 
     # Grab/Create feature scaler
+    print("scaling")
     scaler_path = os.path.join(FEATURE_SCALER_PATH, f"MLP_scaler.pkl")
     if os.path.exists(scaler_path) and not fit_scaler:
 
@@ -210,10 +218,12 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
     val_data_scaled = pd.DataFrame(val_data_scaled, columns=val_data.columns, index=val_data.index)
     backtest_data_scaled = pd.DataFrame(backtest_data_scaled, columns=backtest_data.columns, index=backtest_data.index)
     
+    print("Labeling...")
     train_labeled_data = label_crypto_AB(data=train_data_scaled)
     val_labeled_data = label_crypto_AB(data=val_data_scaled)
 
     # Create input feature vectors based on backward and forward windows
+    print("vectorizing...")
     train_vectored_data = _create_training_feature_vectors(data=train_labeled_data,
                                                            backward_window=backward_window,
                                                            forward_window=forward_window)
@@ -226,6 +236,7 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
     balanced_train_data = _balance_class_labels_undersample(labeled_data=train_vectored_data)
 
     # Save training data
+    print("saving")
     interval_path = {
         '15min':CRYPTO_15MIN_PATH
     }

@@ -13,3 +13,5 @@ COINBASE_API_SECRET = os.getenv("COINBASE_API_SECRET")
 CRYPTO_15MIN_PATH = os.path.join(current_dir, "data\\datasets\\15min\\")
 COINBASE_15MIN_PATH = os.path.join(current_dir, "data\\datasets\\15min\\coinbase\\coinbase_15min")
 OKX_15MIN_PATH = os.path.join(current_dir, "data\\datasets\\15min\\okx\\okx_15min")
+
+BACKTEST_DATA_PATH = os.path.join(current_dir, "data\\datasets\\15min\\scaled_backtest.csv")

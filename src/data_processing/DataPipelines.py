@@ -3,6 +3,7 @@ import numpy as np
 import pickle
 import os
 
+from imblearn.under_sampling import RandomUnderSampler
 from sklearn.preprocessing import RobustScaler
 from sklearn.utils import resample
 
@@ -12,7 +13,7 @@ from .config import FEATURES_EXCLUDED, FEATURE_SCALER_PATH, CRYPTO_15MIN_PATH
 
 def _balance_class_labels_undersample(labeled_data: pd.DataFrame) -> pd.DataFrame:
     '''
-    Performs undersampling to balance the class labels of the provided data.
+    Performs undersampling to balance the class labels of the provided data using imbalanced-learn library.
 
     Parameters:
         labeled_data (pd.DataFrame): The labeled dataset to balance.
@@ -21,15 +22,18 @@ def _balance_class_labels_undersample(labeled_data: pd.DataFrame) -> pd.DataFram
         pd.DataFrame: A class balanced dataset.
     '''
 
-    # Balance the classes
-    buy_data = labeled_data[labeled_data['label'] == 0]
-    hold_data = labeled_data[labeled_data['label'] == 1]
-    sell_data = labeled_data[labeled_data['label'] == 2]
+    # Separate features and labels
+    X = labeled_data.drop(columns=['label'])
+    y = labeled_data['label']
 
-    majority_undersampled = resample(hold_data, replace=False,
-                                     n_samples=len(buy_data),
-                                     random_state=42)
-    balanced_data = pd.concat([buy_data, majority_undersampled, sell_data])
+    # Create RandomUnderSampler instance
+    rus = RandomUnderSampler(random_state=42)
+
+    # Apply undersampling
+    X_resampled, y_resampled = rus.fit_resample(X, y)
+
+    # Combine the resampled features and labels into a DataFrame
+    balanced_data = pd.concat([pd.DataFrame(X_resampled, columns=X.columns), pd.DataFrame(y_resampled, columns=['label'])], axis=1)
 
     return balanced_data
 
@@ -91,21 +95,28 @@ def _create_training_feature_vectors(data: pd.DataFrame,
 
     return examples
 
-def _split_data(raw_data: pd.DataFrame, split_ratio=0.7):
+def _split_data(raw_data: pd.DataFrame, 
+                split_ratio: float = 0.7,
+                backtest_start: str = '2022-01-01',
+                backtest_end: str = '2022-04-01') -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Splits data into training and validation sets based on the specified ratio.
+    Splits data into training and validation sets based on the specified ratio, after
+    seperating the backtest data within the specified dates.
     
     Parameters:
-        raw_data (pd.DataFrame): The input data to be split.
-        split_ratio (float): The ratio for training data (default = 0.8).
+        raw_data (pd.DataFrame): The input data to be split, must include 'timestamp' in yyyy-mm-dd format.
+        split_ratio (float): The ratio for training data (default = 0.7).
+        backtest_start (str): Start date of backtesting data (default = '2022-01-01')
+        backtest_end (str): End date of backtesting data (default = '2022-04-01')
 
     Returns:
-        pd.DataFrame, pd.DataFrame: Training and validation data.
+        pd.DataFrame, pd.DataFrame, pd.DataFrame: Training, validation, backtest.
     """
+    backtest_data = raw_data[(raw_data['timestamp'] >= backtest_start) & (raw_data['timestamp'] <= backtest_end)]
     split_index = int(len(raw_data) * split_ratio)
     train_data = raw_data.iloc[:split_index]
     val_data = raw_data.iloc[split_index:]
-    return train_data, val_data
+    return train_data, val_data, backtest_data
 
 # def create_test_dataset(raw_data: pd.DataFrame,
 #                             candle_interval: str,
@@ -165,11 +176,15 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
 
     # Extract the features
     raw_data = extract_features_OHLCV(raw_data=raw_data)
-    raw_data = remove_columns_processed_data(raw_data, remove_columns=FEATURES_EXCLUDED)
-
-    # Split data into training and validation sets
-    train_data, val_data = _split_data(raw_data=raw_data)
     
+    # Split data into training and validation sets
+    train_data, val_data, backtest_data = _split_data(raw_data=raw_data)
+    
+    # Remove unneeded columns
+    train_data = remove_columns_processed_data(train_data, remove_columns=FEATURES_EXCLUDED)
+    val_data = remove_columns_processed_data(val_data, remove_columns=FEATURES_EXCLUDED)
+    backtest_data = remove_columns_processed_data(backtest_data, remove_columns=FEATURES_EXCLUDED)
+
     # Grab/Create feature scaler
     scaler_path = os.path.join(FEATURE_SCALER_PATH, f"MLP_scaler.pkl")
     if os.path.exists(scaler_path) and not fit_scaler:
@@ -178,11 +193,13 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
             scaler = pickle.load(file)
             train_data_scaled = scaler.transform(train_data)
             val_data_scaled = scaler.transform(val_data)
+            backtest_data_scaled = scaler.transform(backtest_data)
 
     else:
         scaler = RobustScaler()
         train_data_scaled = scaler.fit_transform(train_data)
         val_data_scaled = scaler.transform(val_data)
+        backtest_data_scaled = scaler.transform(backtest_data)
         
         # Save scaler for later use
         with open(scaler_path, 'wb') as file:
@@ -191,6 +208,7 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
     # Label the datasets
     train_data_scaled = pd.DataFrame(train_data_scaled, columns=train_data.columns, index=train_data.index)
     val_data_scaled = pd.DataFrame(val_data_scaled, columns=val_data.columns, index=val_data.index)
+    backtest_data_scaled = pd.DataFrame(backtest_data_scaled, columns=backtest_data.columns, index=backtest_data.index)
     
     train_labeled_data = label_crypto_AB(data=train_data_scaled)
     val_labeled_data = label_crypto_AB(data=val_data_scaled)
@@ -213,9 +231,11 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
     }
     save_path_train = interval_path[candle_interval] + f"scaled_labeled_bWin_{backward_window}_fWin_{forward_window}_train.csv"
     save_path_val = interval_path[candle_interval] + f"scaled_labeled_bWin_{backward_window}_fWin_{forward_window}_val.csv"
-
+    save_path_backtest = interval_path[candle_interval] + f"scaled_backtest.csv"
+    
     balanced_train_data.to_csv(save_path_train, index=False)
     val_vectored_data.to_csv(save_path_val, index=False)
+    backtest_data_scaled.to_csv(save_path_backtest, index=False)
 
     return balanced_train_data, val_vectored_data
 

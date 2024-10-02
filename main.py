@@ -29,18 +29,14 @@ def main():
         data = fetch_historical_crypto_data(trading_sym, exchange_name=exchange, since=since, until=until, save_path=data_path + ".csv", save = True)
     else:
         data = pd.read_csv(data_path + ".csv")
-        
-    # Save backtesting data seperately
-    backtest_data = data[(data['timestamp'] >= backtest_since_date) & (data['timestamp'] <= backtest_until_date)]
-    print(backtest_data)
-    exit()
-
+    
     bWin = 5
     fWin = 1
     training_pipeline_OHLCV(raw_data=data, candle_interval='15min', backward_window=bWin, forward_window=fWin)
-    path = CRYPTO_15MIN_PATH + f"scaled_labeled_bWin_{bWin}_fWin_{fWin}.csv"
-    model = NN_Algo()
-    train_model(model, path)
+    train_path = CRYPTO_15MIN_PATH + f"scaled_labeled_bWin_{bWin}_fWin_{fWin}_train.csv"
+    val_path = CRYPTO_15MIN_PATH + f"scaled_labeled_bWin_{bWin}_fWin_{fWin}_val.csv"
+    model = NN_Algo(200, 5)
+    train_model(model, train_path=train_path, val_path=val_path)
     
 main()
 

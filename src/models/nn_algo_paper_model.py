@@ -13,7 +13,6 @@ class NN_algo_model(nn.Module):
         self.h2 = nn.Linear(64, 32)
         self.output = nn.Linear(32, output_size)
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.01)
-        self.softmax = nn.Softmax(dim=1)
         self.criterion = nn.CrossEntropyLoss()
         
     def forward(self, x):
@@ -21,7 +20,6 @@ class NN_algo_model(nn.Module):
         x = self.leaky_relu(self.h1(x))
         x = self.leaky_relu(self.h2(x))
         x = self.output(x)
-        x = self.softmax(x)
         
         return x
     
@@ -44,7 +42,8 @@ class NN_Algo(L.LightningModule):
         # Step interval for logging training accuracy to console
         steps_interval = 350
         if self.global_step % steps_interval == 0:
-            preds = torch.argmax(logits, dim=1)
+            probs = torch.softmax(logits, dim=1)
+            preds = torch.argmax(probs, dim=1)
             acc = (preds == y).float().mean()
             print(acc)
         
@@ -58,7 +57,8 @@ class NN_Algo(L.LightningModule):
         logits = self.model(x)
         loss = self.model.criterion(logits, y)
 
-        preds = torch.argmax(logits, dim=1)
+        probs = torch.softmax(logits, dim=1)
+        preds = torch.argmax(probs, dim=1)
         acc = (preds == y).float().mean()
         self.validation_accs.append(acc)
 

@@ -76,7 +76,8 @@ def predict(model, data: pd.DataFrame, device: str = 'cpu') -> int:
     
     with torch.no_grad():
         prediction = model(data_tensor)
-        label = torch.argmax(prediction, dim=1)
+        probs = torch.softmax(prediction, dim=1)
+        label = torch.argmax(probs, dim=1)
 
     return int(label.item())
 

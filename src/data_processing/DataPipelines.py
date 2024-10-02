@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import pickle
 import os
 
@@ -32,23 +33,23 @@ def _balance_class_labels_undersample(labeled_data: pd.DataFrame) -> pd.DataFram
 
     return balanced_data
 
-def create_training_feature_vectors(data: pd.DataFrame,
+def _create_training_feature_vectors(data: pd.DataFrame,
                            backward_window: int = 5,
-                           forward_window: int = 2) -> pd.DataFrame:
+                           forward_window: int = 1) -> np.ndarray:
     '''
     Creates the feature vectorized data based on the backward and forward windows.
 
     Parameters:
         data (pd.DataFrame): The processed data to turn into feature vectors.
         backward_window (int): The number of days to look back and include as features. (default = 5)
-        forward_window (int): The number of days to look ahead and include as targets. (default = 2)
+        forward_window (int): The number of days to look ahead and include as targets. (default = 1)
 
     Returns:
         pd.DataFrame: A new dataframe containing the flattened feature vectors containing backward_window examples,
         and forward_window labels.
     '''
 
-    training_data = pd.DataFrame()
+    examples = list()
     initial_position = backward_window + forward_window
     for offset in range(0, len(data) - backward_window, forward_window):
         
@@ -57,21 +58,29 @@ def create_training_feature_vectors(data: pd.DataFrame,
         forward_window_front_pos = backward_window_front_pos + forward_window
 
         # Grab the current window data
-        backward_data = data.iloc[offset:backward_window_front_pos]
-        forward_data = data.iloc[backward_window_front_pos:forward_window_front_pos]
+        backward_data = data.iloc[offset:backward_window_front_pos, :-forward_window]
+        forward_data = data.iloc[backward_window_front_pos:forward_window_front_pos, -forward_window:]
+
+        print(backward_data)
+        print(forward_data)
 
         # Create training example
         features = backward_data.values.flatten()
-        labels = forward_data[:, -forward_window:].values.flatten()
+        labels = forward_data.values.flatten()
         print(features)
         print(labels)
 
-    return training_data
+        example = np.concatenate([features, labels], axis=0)
+        examples.append(example)
+
+    print(pd.DataFrame(examples))
+
+    return examples
 
 def training_pipeline_OHLCV(raw_data: pd.DataFrame,
                             candle_interval: str,
                             backward_window: int = 5,
-                            forward_window: int = 2) -> pd.DataFrame:
+                            forward_window: int = 1) -> pd.DataFrame:
     '''
     Converts the provided raw OHLCV cryptocurrency data into a useable format for training.
     
@@ -79,7 +88,7 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
         raw_data (pd.DataFrame): The raw data to be converted into training data.
         candle_interval (str): The timespan between data points (e.g. '15min', '1h', etc.)
         backward_window (int): The number of days to look back in the data for the input vector. (default = 5)
-        forward_window (int): The number of days to predict the label for. (default = 2)
+        forward_window (int): The number of days to predict the label for. (default = 1)
 
     Returns:
         pd.DataFrame: A ready-made training dataset.
@@ -110,7 +119,7 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
     labeled_data = label_crypto_AB(data=raw_data_scaled)
 
     # Create input feature vectors based on backward window and labels from forward window
-    vectored_data = create_training_feature_vectors(data=labeled_data,
+    vectored_data = _create_training_feature_vectors(data=labeled_data,
                                                     backward_window=backward_window,
                                                     forward_window=forward_window)
 

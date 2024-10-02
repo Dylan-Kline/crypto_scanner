@@ -2,7 +2,7 @@ import pandas as pd
 
 def backtest(model,
              historical_data: pd.DataFrame,
-             forward_window: int = 2,
+             forward_window: int = 1,
              backward_window: int = 5,
              initial_capital: float = 10000.0,
              stop_loss: float = 0.1,
@@ -14,7 +14,7 @@ def backtest(model,
     Parameters:
         model: The classification model to predict whether to 'buy', 'sell', or 'hold'
         historical_data (pd.DataFrame): The fully processed and normalized historical data sorted in temporal order by timestamp to backtest upon (long or short periods).
-        forward_window (int): The number of days to look ahead for predictions. (default = 2)
+        forward_window (int): The number of days to look ahead for predictions. (default = 1)
         backward_window (int): The number of days to look back for feature extraction. (default = 5)
         initial_capital (float): The starting capital for the trading simulation. (default = 10000.0)
         stop_loss (float): The percentage of the price to use as a stop loss threshold. (default = 0.1)

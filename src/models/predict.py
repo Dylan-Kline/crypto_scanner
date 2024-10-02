@@ -32,19 +32,29 @@ def _create_model_from_hparams(hparams):
 def _process_prediction(prediction):
     print(f"Prediction: {prediction.item()}")
 
-def load_prediction_model(checkpoint_path: str, device: str = 'cuda:0'):
+def load_prediction_model(checkpoint_path: str, 
+                          input_size: int, 
+                          output_size: int, 
+                          device: str = 'cpu'):
     '''
-    Loads the lightning model saved at the checkpoint_path and loads it to the given device.
-    
+    Loads the trained model from a checkpoint.
+
     Parameters:
-        checkpoint_path (str): The file path containing the .ckpt model checkpoint.
-        device (str): The device to load the model to ('cpu' or 'cuda:device id') (default = 'cuda:0')
-        
+        checkpoint_path (str): Path to the saved checkpoint.
+        input_size (int): Input size for the model.
+        output_size (int): Output size for the model.
+        device (str): Device on which to load the model (e.g., 'cpu' or 'cuda').
+
     Returns:
-        Loaded model in evaluation mode.
+        LightningModule: Loaded model ready for inference.
     '''
     
-    model = NN_Algo.load_from_checkpoint(checkpoint_path=checkpoint_path, map_location=device)
+    model = NN_Algo.load_from_checkpoint(
+        checkpoint_path=checkpoint_path,
+        input_size=input_size,
+        output_size=output_size,
+        map_location=device
+    )
     model.eval()
     return model
     
@@ -72,7 +82,7 @@ def predict(model, data: pd.DataFrame, device: str = 'cpu') -> int:
     model.eval()
 
     # Convert the data to a tensor
-    data_tensor = torch.tensor(data.values, dtype=torch.float32).unsqueeze(0).to(device)
+    data_tensor = torch.tensor(data, dtype=torch.float32).unsqueeze(0).to(device)
     
     with torch.no_grad():
         prediction = model(data_tensor)
@@ -118,7 +128,7 @@ async def real_time_predictions(model,
             backward_data = features_scaled.iloc[-backward_window:]
 
             # Flatten the scaled features to create the input vector
-            feature_vector = backward_data.values().flatten()
+            feature_vector = backward_data.values.flatten()
             
             # Make a prediction using the model
             prediction = predict(model=model, data=feature_vector, device=device)

@@ -267,5 +267,6 @@ def prediction_pipeline_OHLCV(raw_data: pd.DataFrame) -> pd.DataFrame:
     
     # Scale all data
     raw_data_scaled = scaler.transform(raw_data)
+    raw_data_scaled = pd.DataFrame(data=raw_data_scaled, columns=raw_data.columns)
 
     return raw_data_scaled

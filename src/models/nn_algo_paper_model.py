@@ -34,6 +34,9 @@ class NN_Algo(L.LightningModule):
         self.validation_accs = list()
         self.validation_steps_counter = 0
         
+    def forward(self, x):
+        return self.model(x)
+        
     def training_step(self, batch, batch_indx):
         x, y = batch
         logits = self.model(x)

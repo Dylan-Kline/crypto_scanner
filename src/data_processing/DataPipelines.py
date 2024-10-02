@@ -83,18 +83,72 @@ def _create_training_feature_vectors(data: pd.DataFrame,
         # Create training example
         features = backward_data.values.flatten()
         labels = forward_data.values.flatten()
-
         example = np.concatenate([features, labels], axis=0)
         examples.append(example)
 
+    # Create new training vector dataframe
     examples = pd.DataFrame(examples, columns=new_feature_names)
 
     return examples
 
+def _split_data(raw_data: pd.DataFrame, split_ratio=0.7):
+    """
+    Splits data into training and validation sets based on the specified ratio.
+    
+    Parameters:
+        raw_data (pd.DataFrame): The input data to be split.
+        split_ratio (float): The ratio for training data (default = 0.8).
+
+    Returns:
+        pd.DataFrame, pd.DataFrame: Training and validation data.
+    """
+    split_index = int(len(raw_data) * split_ratio)
+    train_data = raw_data.iloc[:split_index]
+    val_data = raw_data.iloc[split_index:]
+    return train_data, val_data
+
+# def create_test_dataset(raw_data: pd.DataFrame,
+#                             candle_interval: str,
+#                             backward_window: int = 5,
+#                             forward_window: int = 1,
+#                             scaler_path: str = os.path.join(FEATURE_SCALER_PATH, f"MLP_scaler.pkl")) -> pd.DataFrame:
+#     '''
+#     Converts the provided raw data into a test dataset that can be used for final model evaluation.
+    
+#     Parameters:
+#         raw_data (pd.DataFrame): The raw data to be converted into a test dataset.
+#         candle_interval (str): The candle interval the dataset contains.
+#         backward_window (int): The number of days to look back in the data for the input vector. (default = 5)
+#         forward_window (int): The number of days to predict the label for. (default = 1)
+#         scaler_path (str): The path to the pre-fitted scaler to be used for scaling the test data.
+
+#     Returns:
+#         pd.DataFrame: A ready-made test dataset.
+#     '''
+#     interval_path = {
+#         '15min':CRYPTO_15MIN_PATH
+#     }
+    
+#     # Load pre-fitted scaler
+#     with open(scaler_path, 'rb') as file:
+#         scaler = pickle.load(file)
+        
+#     # Extract features
+#     raw_data = extract_features_OHLCV(raw_data=raw_data)
+#     raw_data = remove_columns_processed_data(raw_data, remove_columns=FEATURES_EXCLUDED)
+
+#     # Scale the test data
+#     raw_data_scaled = scaler.transform(raw_data)
+#     raw_data_scaled = pd.DataFrame(raw_data_scaled, columns=raw_data.columns, index=raw_data.index)
+
+#     # Label
+#     labeled_data = label_crypto_AB(data=raw_data_scaled)
+
 def training_pipeline_OHLCV(raw_data: pd.DataFrame,
                             candle_interval: str,
                             backward_window: int = 5,
-                            forward_window: int = 1) -> pd.DataFrame:
+                            forward_window: int = 1,
+                            fit_scaler: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
     '''
     Converts the provided raw OHLCV cryptocurrency data into a useable format for training.
     
@@ -103,51 +157,67 @@ def training_pipeline_OHLCV(raw_data: pd.DataFrame,
         candle_interval (str): The timespan between data points (e.g. '15min', '1h', etc.)
         backward_window (int): The number of days to look back in the data for the input vector. (default = 5)
         forward_window (int): The number of days to predict the label for. (default = 1)
-
+        fit_scaler (bool): Whether to fit the scaler to the training data or not. (default = False)
+        
     Returns:
-        pd.DataFrame: A ready-made training dataset.
+        pd.DataFrame: Ready made training and validation datasets
     '''
 
     # Extract the features
     raw_data = extract_features_OHLCV(raw_data=raw_data)
     raw_data = remove_columns_processed_data(raw_data, remove_columns=FEATURES_EXCLUDED)
 
+    # Split data into training and validation sets
+    train_data, val_data = _split_data(raw_data=raw_data)
+    
     # Grab/Create feature scaler
     scaler_path = os.path.join(FEATURE_SCALER_PATH, f"MLP_scaler.pkl")
-    if os.path.exists(scaler_path):
+    if os.path.exists(scaler_path) and not fit_scaler:
 
         with open(scaler_path, 'rb') as file:
             scaler = pickle.load(file)
-            raw_data_scaled = scaler.transform(raw_data)
+            train_data_scaled = scaler.transform(train_data)
+            val_data_scaled = scaler.transform(val_data)
 
     else:
         scaler = RobustScaler()
-        raw_data_scaled = scaler.fit_transform(raw_data)
+        train_data_scaled = scaler.fit_transform(train_data)
+        val_data_scaled = scaler.transform(val_data)
         
         # Save scaler for later use
         with open(scaler_path, 'wb') as file:
             pickle.dump(scaler, file)
 
-    # Label the data
-    raw_data_scaled = pd.DataFrame(raw_data_scaled, columns=raw_data.columns)
-    labeled_data = label_crypto_AB(data=raw_data_scaled)
+    # Label the datasets
+    train_data_scaled = pd.DataFrame(train_data_scaled, columns=train_data.columns, index=train_data.index)
+    val_data_scaled = pd.DataFrame(val_data_scaled, columns=val_data.columns, index=val_data.index)
+    
+    train_labeled_data = label_crypto_AB(data=train_data_scaled)
+    val_labeled_data = label_crypto_AB(data=val_data_scaled)
 
-    # Create input feature vectors based on backward window and labels from forward window
-    vectored_data = _create_training_feature_vectors(data=labeled_data,
-                                                    backward_window=backward_window,
-                                                    forward_window=forward_window)
+    # Create input feature vectors based on backward and forward windows
+    train_vectored_data = _create_training_feature_vectors(data=train_labeled_data,
+                                                           backward_window=backward_window,
+                                                           forward_window=forward_window)
+    
+    val_vectored_data = _create_training_feature_vectors(data=val_labeled_data,
+                                                         backward_window=backward_window,
+                                                         forward_window=forward_window)
 
     # Balance the classes
-    balanced_data = _balance_class_labels_undersample(labeled_data=vectored_data)
+    balanced_train_data = _balance_class_labels_undersample(labeled_data=train_vectored_data)
 
     # Save training data
     interval_path = {
         '15min':CRYPTO_15MIN_PATH
     }
-    save_path = interval_path[candle_interval] + "scaled_labeled.csv"
-    balanced_data.to_csv(save_path, index=False)
+    save_path_train = interval_path[candle_interval] + f"scaled_labeled_bWin_{backward_window}_fWin_{forward_window}_train.csv"
+    save_path_val = interval_path[candle_interval] + f"scaled_labeled_bWin_{backward_window}_fWin_{forward_window}_val.csv"
 
-    return balanced_data
+    balanced_train_data.to_csv(save_path_train, index=False)
+    val_vectored_data.to_csv(save_path_val, index=False)
+
+    return balanced_train_data, val_vectored_data
 
 def prediction_pipeline_OHLCV(raw_data: pd.DataFrame) -> pd.DataFrame:
     '''
@@ -158,7 +228,7 @@ def prediction_pipeline_OHLCV(raw_data: pd.DataFrame) -> pd.DataFrame:
         raw_data (pd.DataFrame): The raw data to be converted, which should contain at least 200 candles.
         
     Returns:
-        pd.DataFrame: A fully processed dataset for prediction, containing only the most recent timestamp.
+        pd.DataFrame: A fully processed dataset for prediction.
     '''
     
     # Extract the features and remove unnecessary columns
@@ -177,8 +247,5 @@ def prediction_pipeline_OHLCV(raw_data: pd.DataFrame) -> pd.DataFrame:
     
     # Scale all data
     raw_data_scaled = scaler.transform(raw_data)
-    
-    # Select the most recent candle to use for prediction
-    latest_data = raw_data_scaled[:-1].copy()
-    
-    return latest_data
+
+    return raw_data_scaled

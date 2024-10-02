@@ -13,6 +13,7 @@ from lightning import LightningModule
 from ..util.data_structures.CappedListAsync import AsyncCappedList
 from .nn_algo_paper_model import NN_Algo
 from ..data_processing.Extract_Crypto_Data import fetch_historical_crypto_data
+from ..data_processing.DataPipelines import prediction_pipeline_OHLCV
 
 def _create_model_from_hparams(hparams):
     '''
@@ -71,7 +72,7 @@ def predict(model, data: pd.DataFrame, device: str = 'cpu') -> int:
     model.eval()
 
     # Convert the data to a tensor
-    data_tensor = torch.tensor(data.values, dtype=torch.float32).to(device)
+    data_tensor = torch.tensor(data.values, dtype=torch.float32).unsqueeze(0).to(device)
     
     with torch.no_grad():
         prediction = model(data_tensor)
@@ -79,23 +80,50 @@ def predict(model, data: pd.DataFrame, device: str = 'cpu') -> int:
 
     return int(label.item())
 
-async def real_time_predictions(model, candle_queue: asyncio.Queue, device: str = 'cpu') -> int:
+async def real_time_predictions(model, 
+                                candle_queue: asyncio.Queue,
+                                historical_data: AsyncCappedList, 
+                                device: str = 'cpu',
+                                backward_window: int = 5,) -> None:
     '''
     Performs real time predictions with the provided model.
     
     Parameters:
         model: The model to use for predictions on real time data.
-        device(str): The device to perform inference on.
+        candle_queue (asyncio.Queue): An asynchronous queue to signal when new data is available for prediction.
+        historical_data (AsyncCappedList): An asynchronous capped list to store historical OHLCV data.
+        device (str): The device to perform inference on. (default = 'cpu')
+        backward_window (int): The number of previous candles to use in predicting the next move. (default = 5)
     
     Returns:
-        Int: The predicted class label.
+        None
     '''
-    
     while True:
-        
-        # Fetch real time candlestick data
-        raw_data = await candle_queue.get()
-        print(raw_data)
+        # Wait for the signal indicating new data is available
+        await candle_queue.get()
+
+        # Ensure enough historical data is available for the backward window
+        if await historical_data.get_size() >= backward_window:
+            # Get the most recent `backward_window` candles
+            recent_data = await historical_data.get_list()
+
+            # Convert to DataFrame for processing
+            recent_data_df = pd.DataFrame(recent_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+
+            # Scale the features using the pre-fitted scaler
+            features_scaled = prediction_pipeline_OHLCV(recent_data_df)
+            
+            # Select the last `backward_window` for predictions
+            backward_data = features_scaled.iloc[-backward_window:]
+
+            # Flatten the scaled features to create the input vector
+            feature_vector = backward_data.values().flatten()
+            
+            # Make a prediction using the model
+            prediction = predict(model=model, data=feature_vector, device=device)
+
+            # Handle the prediction (e.g., place it in a result queue or take some action)
+            print(f"Prediction: {prediction}")
     
 async def fetch_real_time_crypto_data(crypto_pair_sym: str, 
                                     exchange_obj, 
@@ -110,7 +138,7 @@ async def fetch_real_time_crypto_data(crypto_pair_sym: str,
         crypto_pair_sym (str): The symbol of the cryptocurrency pair to fetch data for (e.g., 'BTC/USDT').
         exchange_obj: The exchange object that provides methods to fetch real-time and historical OHLCV data.
         timeframe (str): The timeframe for each candle (e.g., '1m', '15m', '1h').
-        candle_queue (asyncio.Queue): An asynchronous queue where the combined candle data (historical + real-time) is placed.
+        candle_queue (asyncio.Queue): An asynchronous queue to signal when new data is available for prediction.
         historical_data (AsyncCappedList): An asynchronous capped list to store historical OHLCV data.
         limit (int, optional): The number of historical candles to fetch initially. Default is 300.
 
@@ -152,7 +180,7 @@ async def fetch_real_time_crypto_data(crypto_pair_sym: str,
             candle_data = pd.DataFrame(all_candles, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
             
             # Put the candle data in the queue for prediction
-            await candle_queue.put(candle_data)
+            await candle_queue.put(1) # signal new data is available
 
             # Sleep until next request time
             start_time_ms = int(time.time() * 1000) # Current time in milliseconds

@@ -28,3 +28,9 @@ class AsyncCappedList:
             if len(self.deque) > 0:
                 return self.deque[-1]
             return None
+        
+    async def get_last_n(self, n):
+        async with self.lock:
+            if len(self.deque) > 0 and n < len(self.deque):
+                return self.deque[-n]
+            return None

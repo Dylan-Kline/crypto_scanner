@@ -33,6 +33,20 @@ def _balance_class_labels_undersample(labeled_data: pd.DataFrame) -> pd.DataFram
 
     return balanced_data
 
+def _extract_feature_names(df, label_col='label'):
+    '''
+    Extracts original feature names from the DataFrame, excluding the label column.
+    
+    Parameters:
+        df (pd.DataFrame): The input DataFrame containing features and labels.
+        label_col (str): The name of the label column to be excluded from features.
+    
+    Returns:
+        list: A list of feature column names.
+    '''
+    feature_columns = df.columns[df.columns != label_col].tolist()
+    return feature_columns
+
 def _create_training_feature_vectors(data: pd.DataFrame,
                            backward_window: int = 5,
                            forward_window: int = 1) -> np.ndarray:
@@ -48,10 +62,15 @@ def _create_training_feature_vectors(data: pd.DataFrame,
         pd.DataFrame: A new dataframe containing the flattened feature vectors containing backward_window examples,
         and forward_window labels.
     '''
+    
+    # Create new feature names for all days worth of data up to backward_window size
+    feature_columns = _extract_feature_names(data)  # Get all columns except 'label'
+    new_feature_names = [f"{orig_name}_day_{i+1}" for i in range(backward_window) for orig_name in feature_columns]
+    new_feature_names.append('label')
 
     examples = list()
     initial_position = backward_window + forward_window
-    for offset in range(0, len(data) - backward_window, forward_window):
+    for offset in range(0, len(data) - initial_position + 1, forward_window):
         
         # Get forward positions of both windows
         backward_window_front_pos = offset + backward_window
@@ -61,19 +80,14 @@ def _create_training_feature_vectors(data: pd.DataFrame,
         backward_data = data.iloc[offset:backward_window_front_pos, :-forward_window]
         forward_data = data.iloc[backward_window_front_pos:forward_window_front_pos, -forward_window:]
 
-        print(backward_data)
-        print(forward_data)
-
         # Create training example
         features = backward_data.values.flatten()
         labels = forward_data.values.flatten()
-        print(features)
-        print(labels)
 
         example = np.concatenate([features, labels], axis=0)
         examples.append(example)
 
-    print(pd.DataFrame(examples))
+    examples = pd.DataFrame(examples, columns=new_feature_names)
 
     return examples
 

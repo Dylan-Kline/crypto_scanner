@@ -33,12 +33,10 @@ def label_crypto_AB(data: pd.DataFrame, forW: int = 2, backW: int = 5,
 
     # Set thresholds
     open_close_pct = calculate_open_close_pct_change(data=data, open_price_column=open_price_column, close_price_column=close_price_column)
-    print(open_close_pct)
+    
     alpha = np.percentile(open_close_pct, 85.0)
     beta = np.percentile(open_close_pct, 99.7)
     beta += (forW - 1) * (.1 * beta)
-    print(alpha)
-    print(beta)
 
     # Compute the EMA of close prices using backW
     ema = talib.EMA(data[close_price_column], timeperiod=backW)
@@ -55,7 +53,7 @@ def label_crypto_AB(data: pd.DataFrame, forW: int = 2, backW: int = 5,
 
         # Compute the return of close prices over the next forW period
         #print(close_TK, open_T)
-        future_return = ((1 - fee) * close_TK - (1 - fee) * open_T) / open_T
+        future_return = ((1 - fee) * close_TK - (1 + fee) * open_T) / open_T
         #print(future_return)
         
         # Detemine trade option

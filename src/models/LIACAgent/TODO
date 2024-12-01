@@ -18,6 +18,6 @@ Todo:
     ✔ Low-level Reflection Memory @done(24-12-01 11:41)
     ✔ High-level Reflection Memory @done(24-12-01 11:41)
   ☐ Create an environment that can be reset, and provide a way to step with action?
-
+  ☐ Figure out how to get real time price data, tweets, and news for the agent each day
   
 

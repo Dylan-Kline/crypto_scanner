@@ -13,10 +13,10 @@ Todo:
     ☐ high level reflection
     ☐ decision making
   ☐ Create prompt builder that takes in templates and state, then runs it to get chatgpt response
-  ☐ Define the memory component of the agent
-    ☐ Market Intelligence Memory
-    ☐ Low-level Reflection Memory
-    ☐ High-level Reflection Memory
+  ✔ Define the memory component of the agent @done(24-12-01 11:41)
+    ✔ Market Intelligence Memory @done(24-12-01 11:41)
+    ✔ Low-level Reflection Memory @done(24-12-01 11:41)
+    ✔ High-level Reflection Memory @done(24-12-01 11:41)
   ☐ Create an environment that can be reset, and provide a way to step with action?
 
   

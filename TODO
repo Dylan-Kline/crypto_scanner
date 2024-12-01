@@ -1,0 +1,23 @@
+
+Todo:
+  ☐ Define a general state for the program env (holds all price data, news, etc.)
+  ☐ Implement Sentiment Model Tool
+    ☐ Create a data pipeline for tweets and news
+    ☐ Find a pre-trained model to use for determining sentiment of tweets and news
+  ☐ Implement kline plotting
+  ☐ Implement trading chart plotting
+  ☐ Make prompt templates
+    ☐ latest market intelligence
+    ☐ past market intelligence
+    ☐ low level reflection
+    ☐ high level reflection
+    ☐ decision making
+  ☐ Create prompt builder that takes in templates and state, then runs it to get chatgpt response
+  ☐ Define the memory component of the agent
+    ☐ Market Intelligence Memory
+    ☐ Low-level Reflection Memory
+    ☐ High-level Reflection Memory
+  ☐ Create an environment that can be reset, and provide a way to step with action?
+
+  
+

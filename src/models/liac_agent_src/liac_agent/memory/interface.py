@@ -11,7 +11,7 @@ from collections import deque
 from liac_agent.memory.base import VectorStore, Image
 from liac_agent.memory.faiss import FAISS
 from liac_agent.memory.basic_memory import BasicMemory
-from liac_agent.registry import MEMORY
+from liac_agent_src.liac_agent.registry import MEMORY
 
 @MEMORY.register_module(force=True)
 class MemoryInterface():
